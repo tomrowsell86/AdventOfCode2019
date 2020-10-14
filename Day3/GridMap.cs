@@ -1,10 +1,9 @@
 using System;
 using System.Linq;
-using System.IO;
 using System.Collections.Generic;
 namespace Day3
 {
-    public class GridMap
+    public class GridMap 
     {
         private const int UpperBoundY = 19999;
         private const int UpperBoundX = 30000;
@@ -12,14 +11,14 @@ namespace Day3
         private int _currentX = 15000;
         private int _currentY = 10000;
 
+        private int _totalSteps;
         private char _currentWireId;
-        public GridMap()
-        {
-            _map[_currentX, _currentY] = 'O';
-        }
+        public event EventHandler<WireIntersectionEventArgs> WireIntersected;
+
         public void NewWire(char id)
         {
             _currentWireId = id;
+            _totalSteps = 0;
             _currentX = 15000;
             _currentY = 10000;
         }
@@ -29,6 +28,8 @@ namespace Day3
             int magnitude = int.Parse(instruction.Substring(1));
             foreach (var inc in Enumerable.Range(1, magnitude))
             {
+
+                _totalSteps++;
                 switch (direction)
                 {
                     case "R":
@@ -45,22 +46,32 @@ namespace Day3
                         break;
                 }
                 char currentVal = _map[_currentX, _currentY];
-                _map[_currentX, _currentY] = currentVal != '\0' && currentVal != _currentWireId ? 'X' : _currentWireId;
+                if (currentVal != '\0' && currentVal != _currentWireId)
+                {
+                    if (WireIntersected != null)
+                    {
+                        WireIntersected(this, new WireIntersectionEventArgs(CurrentPosition, _totalSteps, _currentWireId));
+                    }
+                    _map[_currentX, _currentY] = 'X';
+                }
+                 else
+                 {  _map[_currentX, _currentY] = _currentWireId;
+                 }
 
             }
         }
         public int GenerateManhattanValue()
         {
-            List<(int, int)> intersectionCoOrdinates = ScanForIntersections();
+            var intersectionCoOrdinates = ScanForIntersections();
 
-            var lowestManhattonValue = intersectionCoOrdinates.Select(i => Math.Abs(i.Item2 - 10000) +
-                 Math.Abs(i.Item1 - 15000)).OrderBy(v => v).First();
+            var lowestManhattonValue = intersectionCoOrdinates.Select(i => Math.Abs(i.Y - 10000) +
+                 Math.Abs(i.X - 15000)).OrderBy(v => v).First();
             return lowestManhattonValue;
         }
 
-        private List<(int, int)> ScanForIntersections()
+        public List<Position> ScanForIntersections()
         {
-            var intersections = new List<(int, int)>();
+            var intersections = new List<Position>();
 
             for (int y = UpperBoundY; y >= 0; y--)
             {
@@ -69,14 +80,50 @@ namespace Day3
                     if (_map[x, y] == 'X')
                     {
                         Console.WriteLine($"Intersection found : x:{x}, y: {y}");
-                        intersections.Add((x, y));
+                        intersections.Add(new Position { X = x, Y = y });
                     }
                 }
             }
 
             return intersections;
         }
+
+        public Position CurrentPosition
+        {
+            get { return new Position { X = _currentX, Y = _currentY }; }
+        }
+    }
+    public class WireIntersectionEventArgs : EventArgs
+    {
+        public char WireId {get;}
+        public WireIntersectionEventArgs(Position intersectionPosition, int currentStepIncrement, char wireId) : base()
+        {
+            IntersectionPosition = intersectionPosition;
+            CurrentStepIncrement = currentStepIncrement;
+            WireId = wireId;
+        }
+        public Position IntersectionPosition { get; }
+        public int CurrentStepIncrement { get; }
     }
 
+    public struct Position
+    {
+        public static bool operator ==(Position a, Position b) => a.Equals(b);
+        public static bool operator !=(Position a, Position b) => !a.Equals(b);
 
+        public int X { get; set; }
+        public int Y { get; set; }
+
+        public override bool Equals(object obj)
+        {
+            return obj is Position position &&
+                   X == position.X &&
+                   Y == position.Y;
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(X, Y);
+        }
+    }
 }
