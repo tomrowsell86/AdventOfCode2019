@@ -17,24 +17,19 @@ namespace Day5
             while (true)
             {
                 var opCodeText = span[position].ToString();
+                var paramModeRepository = ParameterModeRepository.ParseFromOpCode(opCodeText);
 
                 var parsedOpCode = opCodeText.Length > 1 ? int.Parse(opCodeText.Substring(opCodeText.Length - 2, 2)) : span[position];
-
-                var parameterModes = opCodeText.Length > 1 ? opCodeText
-                .Substring(0, opCodeText.Length - 2)
-                .Reverse()
-                .Select(v => int.Parse(v.ToString()))
-                .ToArray() : new int[0];
 
                 switch (parsedOpCode)
                 {
                     case 1:
 
-                        Operation(span, position, (a, b) => a + b, parameterModes);
+                        Operation(span, position, (a, b) => a + b, paramModeRepository);
                         position += 4;
                         break;
                     case 2:
-                        Operation(span, position, (a, b) => a * b, parameterModes);
+                        Operation(span, position, (a, b) => a * b, paramModeRepository);
                         position += 4;
                         break;
                     case 3:
@@ -45,11 +40,14 @@ namespace Day5
                         break;
                     case 4:
 
-                        var outputValue = IsByRefParameterModeAt(parameterModes, 0) ? 
-                        span[span[position + 1]] : 
-                        span[position + 1];
+                        var outputValue = GetParameterValue(span, 0, paramModeRepository, position);
                         Console.WriteLine(outputValue);
                         position += 2;
+                        break;
+
+                    case 5:
+                        //GetParameterValue(span, position, paramModeRepository);
+
                         break;
                     case 99:
                         return span.ToArray();
@@ -60,18 +58,41 @@ namespace Day5
             }
         }
 
-        private static void Operation(Span<int> span, int position, Func<int, int, int> operation, int[] parameterModes)
+        private static int GetParameterValue(Span<int> span, int position, ParameterModeRepository paramModeRepository, int instructionPointer) =>
+            paramModeRepository.IsByRefParameterModeAt(position) ? span[span[instructionPointer + position + 1 ]] : span[instructionPointer + position + 1];
+
+
+        private static void Operation(Span<int> span, int position, Func<int, int, int> operation, ParameterModeRepository parameterModeRepository)
         {
-            var arg1 = IsByRefParameterModeAt(parameterModes, 0) ? span[span[position + 1]] : span[position + 1];
-            var arg2 = IsByRefParameterModeAt(parameterModes, 1) ? span[span[position + 2]] : span[position + 2];
+            var arg1 = GetParameterValue(span, 0, parameterModeRepository, position);
+            var arg2 = GetParameterValue(span, 1, parameterModeRepository, position);
+         
             var resultPosition = span[position + 3];
             span[resultPosition] = operation(arg1, arg2);
 
         }
+    }
 
-        private static bool IsByRefParameterModeAt(int[] parameterModes, int position)
+    internal class ParameterModeRepository
+    {
+        private readonly int[] parameterModes;
+        private ParameterModeRepository(int[] parameterModes)
         {
-            return parameterModes.Count() < position + 1 || parameterModes[position] == 0;
+            this.parameterModes = parameterModes;
+        }
+
+        public bool IsByRefParameterModeAt(int paramPosition) => parameterModes.Count() < paramPosition + 1 || parameterModes[paramPosition] == 0;
+
+        public static ParameterModeRepository ParseFromOpCode(string opCode)
+        {
+            var modes = opCode.Length > 1 ? opCode
+               .Substring(0, opCode.Length - 2)
+               .Reverse()
+               .Select(v => int.Parse(v.ToString()))
+               .ToArray() : new int[0];
+            return new ParameterModeRepository(modes);
         }
     }
+
+
 }
