@@ -10,67 +10,111 @@ namespace Day5
         {
             this.program = program;
         }
-        public int[] Run(int input)
+        public Span<int> Run(int input)
         {
-            var span = program.AsSpan();
-            var position = 0;
+            var programSpan = program.AsSpan();
+            var instructionPointer = 0;
+
             while (true)
             {
-                var opCodeText = span[position].ToString();
+                var opCodeText = programSpan[instructionPointer].ToString();
                 var paramModeRepository = ParameterModeRepository.ParseFromOpCode(opCodeText);
+                var extractor = new ParameterExtractor(paramModeRepository);
 
-                var parsedOpCode = opCodeText.Length > 1 ? int.Parse(opCodeText.Substring(opCodeText.Length - 2, 2)) : span[position];
+                var parsedOpCode = opCodeText.Length > 1 ? int.Parse(opCodeText.Substring(opCodeText.Length - 2, 2)) : programSpan[instructionPointer];
 
                 switch (parsedOpCode)
                 {
                     case 1:
-
-                        Operation(span, position, (a, b) => a + b, paramModeRepository);
-                        position += 4;
+                        Operation(programSpan, instructionPointer, (a, b) => a + b, extractor);
+                        instructionPointer += 4;
                         break;
                     case 2:
-                        Operation(span, position, (a, b) => a * b, paramModeRepository);
-                        position += 4;
+                        Operation(programSpan, instructionPointer, (a, b) => a * b, extractor);
+                        instructionPointer += 4;
                         break;
                     case 3:
 
-                        span[span[position + 1]] = input;
-                        position += 2;
+                        programSpan[programSpan[instructionPointer + 1]] = input;
+                        instructionPointer += 2;
 
                         break;
                     case 4:
 
-                        var outputValue = GetParameterValue(span, 0, paramModeRepository, position);
+                        var outputValue = extractor.GetParameterValue(programSpan, 0, instructionPointer);
                         Console.WriteLine(outputValue);
-                        position += 2;
+                        instructionPointer += 2;
                         break;
 
                     case 5:
-                        //GetParameterValue(span, position, paramModeRepository);
+                        JumpToWhenTrue(programSpan, ref instructionPointer, extractor, v => v != 0);
+                        break;
+
+                    case 6:
+                        JumpToWhenTrue(programSpan, ref instructionPointer, extractor, v => v == 0);
+                        break;
+
+                    case 7:
+                        WriteTrueIfTrueAt(programSpan, ref instructionPointer, extractor, (a, b) => a < b);
 
                         break;
+                    case 8:
+                        WriteTrueIfTrueAt(programSpan, ref instructionPointer, extractor, (a, b) => a == b);
+                        break;
                     case 99:
-                        return span.ToArray();
-                    default: position++; break;
-
+                        return programSpan;
                 }
-
             }
         }
 
-        private static int GetParameterValue(Span<int> span, int position, ParameterModeRepository paramModeRepository, int instructionPointer) =>
-            paramModeRepository.IsByRefParameterModeAt(position) ? span[span[instructionPointer + position + 1 ]] : span[instructionPointer + position + 1];
-
-
-        private static void Operation(Span<int> span, int position, Func<int, int, int> operation, ParameterModeRepository parameterModeRepository)
+        private static void WriteTrueIfTrueAt(Span<int> programSpan, ref int instructionPointer, ParameterExtractor extractor, Func<int, int, bool> predicate)
         {
-            var arg1 = GetParameterValue(span, 0, parameterModeRepository, position);
-            var arg2 = GetParameterValue(span, 1, parameterModeRepository, position);
-         
-            var resultPosition = span[position + 3];
-            span[resultPosition] = operation(arg1, arg2);
+            var arg1 = extractor.GetParameterValue(programSpan, 0, instructionPointer);
+            var arg2 = extractor.GetParameterValue(programSpan, 1, instructionPointer);
+            var writeToPointer = instructionPointer + 3;
+
+            programSpan[programSpan[writeToPointer]] = predicate(arg1, arg2) ? 1 : 0;
+            instructionPointer += 4;
+        }
+
+        private static void JumpToWhenTrue(Span<int> programSpan, ref int instructionPointer, ParameterExtractor extractor, Func<int, bool> predicate)
+        {
+            var testValue = extractor.GetParameterValue(programSpan, 0, instructionPointer);
+            if (predicate(testValue))
+            {
+                instructionPointer = extractor.GetParameterValue(programSpan, 1, instructionPointer);
+            }
+            else
+            {
+                instructionPointer += 3;
+            }
+        }
+
+        private static void Operation(Span<int> program, int instructionPointer, Func<int, int, int> operation, ParameterExtractor extractor)
+        {
+            var arg1 = extractor.GetParameterValue(program, 0, instructionPointer);
+            var arg2 = extractor.GetParameterValue(program, 1, instructionPointer);
+
+            var resultPosition = program[instructionPointer + 3];
+            program[resultPosition] = operation(arg1, arg2);
 
         }
+    }
+
+    internal class ParameterExtractor
+    {
+        private ParameterModeRepository paramModeRepository;
+
+        public ParameterExtractor(ParameterModeRepository paramModeRepository)
+        {
+            this.paramModeRepository = paramModeRepository;
+        }
+
+        public int GetParameterValue(Span<int> program, int parameterPosition, int instructionPointer) 
+            => paramModeRepository.IsByRefParameterModeAt(parameterPosition) ? 
+                program[program[instructionPointer + parameterPosition + 1]]
+                : 
+                program[instructionPointer + parameterPosition + 1];
     }
 
     internal class ParameterModeRepository

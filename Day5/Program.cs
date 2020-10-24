@@ -9,7 +9,9 @@ namespace Day5
         {
             var program = File.ReadAllText("input.txt").Split(',').Select(c=> int.Parse(c.ToString())).ToArray();
             var interpreter = new OpCodeInterpreter(program);
-            var map = interpreter.Run(1);
+            Console.WriteLine("Enter input code");
+
+            var map = interpreter.Run(5);
             Console.WriteLine("Hello World!");
         }
     }
