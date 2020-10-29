@@ -37,10 +37,8 @@ namespace Day5
 
                         programSpan[programSpan[instructionPointer + 1]] = input;
                         instructionPointer += 2;
-
                         break;
                     case 4:
-
                         var outputValue = extractor.GetParameterValue(programSpan, 0, instructionPointer);
                         Console.WriteLine(outputValue);
                         instructionPointer += 2;
